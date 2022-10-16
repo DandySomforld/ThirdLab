@@ -72,14 +72,12 @@ if __name__ == "__main__":
 
     cg_res = minimize(d_ab, guess, method="CG", tol=epsilon)
     plt.plot(x, func(x, *cg_res.x), color="green", linewidth=2, label="Conjugated Gradient Descent")
-    print("Conjugated Gradient Descent\nA: {}    B: {}    Iter: {}    Func: {}".format(*cg_res.x, cg_res.nit,
-                                                                                       cg_res.nfev))
+    print("Conjugated Gradient Descent\nA: {}    B: {}    Iter: {}    Func: {}".format(*cg_res.x, cg_res.nit, cg_res.nfev))
 
     fprime = lambda x_jac: approx_fprime(x_jac, d_ab, epsilon=epsilon)
     newton_res = minimize(d_ab, guess, method="Newton-CG", jac=fprime, tol=epsilon)
     plt.plot(x, func(x, *newton_res.x), color="blue", linewidth=1, label="Quasi-Newton's CG Descent")
-    print("Quasi-Newtons CG Descent\nA: {}    B: {}    Iter: {}    Func: {}".format(*newton_res.x, newton_res.nit,
-                                                                                    newton_res.nfev))
+    print("Quasi-Newtons CG Descent\nA: {}    B: {}    Iter: {}    Func: {}".format(*newton_res.x, newton_res.nit, newton_res.nfev))
 
 
     def residuals_len_mar(ab, x=x, y=y):
@@ -88,8 +86,7 @@ if __name__ == "__main__":
 
     lev_mar_res = least_squares(residuals_len_mar, guess, method="lm", xtol=epsilon)
     plt.plot(x, func(x, *lev_mar_res.x), label="Levenberg-Marquardt")
-    print("Levenberg-Marquardt\nA: {}    B: {}    Iter: {}    Func: {}".format(*lev_mar_res.x, lev_mar_res.nfev,
-                                                                               lev_mar_res.nfev))
+    print("Levenberg-Marquardt\nA: {}    B: {}    Iter: {}    Func: {}".format(*lev_mar_res.x, lev_mar_res.nfev, lev_mar_res.nfev))
 
     plt.xlabel("x")
     plt.ylabel("y")
