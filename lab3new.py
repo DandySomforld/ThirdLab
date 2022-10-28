@@ -1,30 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import minimize, approx_fprime, least_squares
+from scipy.optimize import minimize
 
 
 def line(x, a, b):
+    """Linear Function"""
     return a * x + b
 
 
 def rational(x, a, b):
+    """Rational Function"""
     return a / (1 + b * x)
 
 
-def d_ab(ab):
-    return np.sum((func(x, ab[0], ab[1]) - y) ** 2)
-
-
-def line_grad(ab):
-    first = np.sum(2 * x * (ab[0] * x + ab[1] - y))
-    second = np.sum(2 * (ab[0] * x + ab[1] - y))
-    return np.array([first, second])
-
-
-def rational_grad(ab):
-    first = np.sum(- (2 * (-ab[0] + ab[1] * x * y + y)) / ((ab[1] * x + 1) ** 2))
-    second = np.sum(- (2 * ab[0] * x * (ab[0] - y * (ab[1] * x + 1))) / ((ab[1] * x + 1) ** 3))
-    return np.array([first, second])
+def d(func, x, y, a, b):
+    return np.sum((func(x, a, b) - y) ** 2)
 
 
 epsilon = 0.001
@@ -34,31 +24,81 @@ beta = np.random.rand(1)
 x_data = np.linspace(0, 1, 101, endpoint=True)
 delta = np.random.normal(size=101)
 y_data = line(x_data, alpha, beta) + delta
-guess = [0.5, 0.5]
 
 
-def bar_bor(gradient, last, cur):
-    grad_dif = gradient(cur) - gradient(last)
-    top = np.abs((cur - last).dot(grad_dif))
-    bottom = np.linalg.norm(grad_dif) ** 2
-    return top / bottom
+# dichotomic search function
+def dichotomic_search(func, domain, eps=epsilon, iter_count=0, func_count=0):
+    iter_count += 1
+    func_count += 1
+    if domain[0] + epsilon > domain[1]:
+        y_left, y_right = func(domain[0]), func(domain[1])
+        func_count += 2
+        if y_left < y_right:
+            return domain[0], y_left, iter_count, func_count
+        else:
+            return domain[1], y_right, iter_count, func_count
+    else:
+        delta = eps / 2
+        x1 = (domain[0] + domain[1] - delta) / 2
+        x2 = (domain[0] + domain[1] + delta) / 2
+        y1, y2 = func(x1), func(x2)
+        func_count += 2
+        if y1 < y2:
+            new_domain = (domain[0], x2)
+        else:
+            new_domain = (x1, domain[1])
+        return dichotomic_search(func, new_domain, eps=eps, iter_count=iter_count, func_count=func_count)
 
 
-def gradient_descent(gradient, start=guess, learn_rate=0.001, max_iter=10000, tolerance=epsilon):
-    minimum = np.array(start)
-    beta = learn_rate
-    for i in range(max_iter):
-        diff = -beta * gradient(minimum)
-        if np.all(np.abs(diff) <= tolerance):
+# exhaustive search function
+def exhaustive_search(x, y, func, a_domain=(0, 1), b_domain=(0, 1), eps=epsilon):
+    D_min = inf
+    iter_count = 0
+    func_count = 0
+    a_data = np.linspace(*a_domain, int((a_domain[1] - a_domain[0]) / eps), endpoint=True)
+    b_data = np.linspace(*b_domain, int((b_domain[1] - b_domain[0]) / eps), endpoint=True)
+    for a in a_data:
+        for b in b_data:
+            iter_count += 1
+            D = d(func, x, y, a, b)
+            func_count += 1
+            if D < D_min:
+                D_min = D
+                a_opt = a
+                b_opt = b
+    return a_opt, b_opt, iter_count, func_count
+
+
+# gauss search function
+def gauss_search(x, y, func, a_domain=(0, 1), b_domain=(0, 1), a_init=0.5, b_init=0.5, eps=epsilon):
+    a, b = a_init, b_init
+    iter_count = 0
+    func_count = 0
+    while True:
+        a_last, b_last = a, b
+
+        def d_a(a):
+            return np.sum((func(x, a, b) - y) ** 2)
+
+        def d_b(b):
+            return np.sum((func(x, a, b) - y) ** 2)
+
+        a_all = dichotomic_search(d_a, a_domain, eps=eps)
+        b_all = dichotomic_search(d_b, b_domain, eps=eps)
+        a, b = a_all[0], b_all[0]
+        iter_count += (a_all[2] + b_all[2] + 1)
+        func_count += (a_all[3] + b_all[3])
+        if np.absolute(a_last - a) <= eps and np.absolute(b_last - b) <= eps:
             break
-        last_minimum = np.copy(minimum)
-        minimum += diff
-        beta = bar_bor(gradient, last_minimum, minimum)
-    return minimum, i, 2 * i
+    return a, b, iter_count, func_count
 
 
 if __name__ == "__main__":
-    func, grad = line, line_grad
+    # Uncomment the line below for linear approximant
+    #func = line
+
+    # Uncomment the line below for rational approximant
+    func = rational
 
     x = x_data
     y = y_data
@@ -66,28 +106,24 @@ if __name__ == "__main__":
     plt.plot(x, func(x, alpha, beta), color="maroon", label="Initial line")
     print("Alpha: {}    Beta: {}".format(alpha, beta))
 
-    grad_res, grad_iter, grad_nfev = gradient_descent(grad)
-    plt.plot(x, func(x, *grad_res), color="red", linewidth=3, label="Gradient Descent")
-    print("Gradient Descent\nA: {}    B: {}    Iter: {}    Func: {}".format(*grad_res, grad_iter, grad_nfev))
+    # exhaustive search result
+    ex_search = exhaustive_search(x, y, func)
+    plt.plot(x, func(x, *ex_search[:-2]), label="Exhaustive")
+    print("Exhaustive search\nA: {}    B: {}    Iter: {}    Func: {}".format(*ex_search))
 
-    cg_res = minimize(d_ab, guess, method="CG", tol=epsilon)
-    plt.plot(x, func(x, *cg_res.x), color="green", linewidth=2, label="Conjugated Gradient Descent")
-    print("Conjugated Gradient Descent\nA: {}    B: {}    Iter: {}    Func: {}".format(*cg_res.x, cg_res.nit, cg_res.nfev))
-
-    fprime = lambda x_jac: approx_fprime(x_jac, d_ab, epsilon=epsilon)
-    newton_res = minimize(d_ab, guess, method="Newton-CG", jac=fprime, tol=epsilon)
-    plt.plot(x, func(x, *newton_res.x), color="blue", linewidth=1, label="Quasi-Newton's CG Descent")
-    print("Quasi-Newtons CG Descent\nA: {}    B: {}    Iter: {}    Func: {}".format(*newton_res.x, newton_res.nit, newton_res.nfev))
+    # Gauss method result
+    ga_search = gauss_search(x, y, func)
+    plt.plot(x, func(x, *ga_search[:-2]), label="Gauss")
+    print("Gauss search\nA: {}    B: {}    Iter: {}    Func: {}".format(*ga_search))
 
 
-    def residuals_len_mar(ab, x=x, y=y):
-        return func(x, ab[0], ab[1]) - y
+    def d_ab(ab):
+        return np.sum((func(x, ab[0], ab[1]) - y) ** 2)
 
-
-    lev_mar_res = least_squares(residuals_len_mar, guess, method="lm", xtol=epsilon)
-    plt.plot(x, func(x, *lev_mar_res.x), label="Levenberg-Marquardt")
-    print("Levenberg-Marquardt\nA: {}    B: {}    Iter: {}    Func: {}".format(*lev_mar_res.x, lev_mar_res.nfev, lev_mar_res.nfev))
-
+    guess = [0.5, 0.5]
+    nelder_mead_res = minimize(d_ab, guess, method="Nelder-Mead", tol=epsilon)
+    plt.plot(x, func(x, *nelder_mead_res.x), label="Nelder-Mead")
+    print("Nelder-Mead search\nA: {}    B: {}    Iter: {}    Func: {}".format(*nelder_mead_res.x, nelder_mead_res.nit, nelder_mead_res.nfev))
     plt.xlabel("x")
     plt.ylabel("y")
     plt.legend()
